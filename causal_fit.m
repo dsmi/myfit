@@ -1,13 +1,13 @@
-function [ poles, resid, rmserr ] = causal_fit( f, v, npoles, niter )
-% [ poles, resid, rmserr ] = causal_fit( f, v, npoles, niter )
+function [ poles, resid, d, rmserr ] = causal_fit( f, v, npoles, niter )
+% [ poles, resid, d, rmserr ] = causal_fit( f, v, npoles, niter )
 %
 % Simple implementation of the vector fitting, does not use negative
 % frequencies, ensures perfect causal pole pairs.
 %
 
 frq = f;
-val = v;   
-    
+val = v;
+
 % Laplace variable, n-by-1
 s = 2*pi*i*frq;
 
@@ -26,8 +26,20 @@ poles = [ poles endp*ones( 1, rem( npoles, 2 ) ) ];
 ns = size( s, 1 );
 np = size( poles, 2 );
 
-% Iterations
-for iter = 1:niter
+% Matrix A, used for the pole identification, consists of three row blocks.
+% Here is how a row of the A matrix looks like, below the block boundaries
+% are shown:
+%   Ak = [  1/(sk-a1) ... 1/(sk-aN) 1 sk  -f(sk)/(sk-a1) ... -f(sk)/(sk-aN) ]
+%          |        A1             | A2  |                   A3            |
+
+% Mid-block of the A matrix, which includes constant and linear terms
+% and does not change.
+A2 = [ ones( ns, 1 ) ];
+%% A2 = [ ones( ns, 1 ) s ];
+
+% Pole relocation iterations, plus another one to calculate A1 for
+% the final residue calculation
+for iter = 1:(niter+1)
 
     A1 = 1 ./ ( repmat( s, 1, np ) - repmat( poles, ns, 1 ) );
 
@@ -43,15 +55,15 @@ for iter = 1:niter
     A1( :,cpi1 ) = 1 ./ ( s - ai ) + 1 ./ ( s - conj( ai ) );
     A1( :,cpi2 ) = j ./ ( s - ai ) - j ./ ( s - conj( ai ) );
 
-    %% % Modify the corresponding elements of A
-    %% ai = poles(1);
-    %% A1( :,1 ) = 1 ./ ( s - ai ) + 1 ./ ( s - conj( ai ) );
-    %% A1( :,2 ) = j ./ ( s - ai ) - j ./ ( s - conj( ai ) );
-    
-    A2 = [ ]; % [ ones( ns, 1 ) s ];
+    % Is it the final n+1 iteration, where we only need to calculate A1?
+    if iter > niter
+        break
+    end
+
     A3 = -repmat( val, 1, np ) .* A1;
 
     A = [ A1 A2 A3 ];
+
     b = val;
 
     x = [ real(A) ; imag(A) ] \ [ real(b) ; imag(b) ]; % to preserve conjugacy
@@ -88,12 +100,23 @@ for iter = 1:niter
 
 end
 
-% Find residues of approximated val
-A1 = 1 ./ ( repmat( s, 1, np ) - repmat( poles, ns, 1 ) );
-resid = A1\val;
+% Doing final residue calculation
+A = [ A1 A2 ];
+
+b = val;
+
+x = [ real(A) ; imag(A) ] \ [ real(b) ; imag(b) ]; % to preserve conjugacy
+
+% Residues, with conjugate pairs
+resid = x( 1 : np ); % real
+resid(cpi1) = real( x( cpi1 ) ) + j*real( x( cpi2 ) );
+resid(cpi2) = real( x( cpi1 ) ) - j*real( x( cpi2 ) );
+
+% Constant term
+d = x( np + 1 );
 
 % Calculate error
 residr = repmat( resid.', ns, 1 );
 pr = repmat( poles, ns, 1 );
-vt = sum( residr ./ ( repmat( s, 1, np ) - pr ), 2 );
+vt = sum( residr ./ ( repmat( s, 1, np ) - pr ), 2 ) + d;
 rmserr = sqrt( sum( abs( ( vt - val ).^2 ) ) ) / sqrt( ns );
