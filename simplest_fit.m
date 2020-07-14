@@ -18,17 +18,17 @@ end
 s = 2*pi*i*frq;
 
 % Initial poles
-startp = max( f(1), 10 );
-endp   = f(end);
+startp = max( f(1), 10 )*2*pi;
+endp   = f(end)*2*pi;
 pval   = linspace( startp, endp, floor( npoles/2 ) );
 
 % Place conjugate poles next to each other
 poles = 0*[ pval pval ]; 
-poles( 1:2:end ) = pval*1.0e-2 + i*pval;
-poles( 2:2:end ) = pval*1.0e-2 - i*pval;
+poles( 1:2:end ) = -pval*1.0e-2 + i*pval;
+poles( 2:2:end ) = -pval*1.0e-2 - i*pval;
 
 % Another real one if the number is odd
-poles = [ poles endp*ones( 1, rem( npoles, 2 ) ) ];
+poles = [ poles -endp*ones( 1, rem( npoles, 2 ) ) ];
 
 ns = size( s, 1 );
 np = size( poles, 2 );
@@ -63,6 +63,9 @@ for iter = 1:(niter+1)
     
     A = [ A1 A2 A3 ];
     
+    %% [Q,R]=qr(A);
+    %% y = Q'*b;
+    %% x = R\y;
     x = A\b;
 
     % Residues of val*sigma approximation, and constant term (don't need here)
@@ -78,7 +81,11 @@ for iter = 1:(niter+1)
     zs = eig( H );
 
     poles = zs.';
-    
+
+    % Flipping unstable poles
+    unstables = real(poles)>0;  
+    poles(unstables) = poles(unstables) - 2*real(poles(unstables));
+ 
 end
 
 % Doing final residue calculation

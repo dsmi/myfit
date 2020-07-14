@@ -26,10 +26,10 @@ a2=s2;
 Y2=c1./(s-a1)+c2./(s-a2);
 
 % Order of approximation, number of poles
-npoles = 50;
+npoles = 2;
 
 % Number of the pole relocating iterations
-niter = 3;
+niter = 1;
 
-[ poles, resid, rmserr ] = causal_fit( fhz.', Y.', npoles, niter );
+[ poles, resid, d, rmserr ] = causal_fit( fhz.', Y.', (Y.')*0+1, npoles, niter, 0 );
 rmserr

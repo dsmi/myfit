@@ -1,5 +1,5 @@
-function [ rmserr, maxerr ] = calc_err( f, v, poles, resid, d )
-% [ f, v ] = calc_err( f, v, poles, resid, d )
+function [ rmserr, maxerr, err ] = calc_err( f, v, poles, resid, d )
+% [ rmserr, maxerr, err ] = calc_err( f, v, poles, resid, d )
 %
 % Calculate the fitting error.
 %
@@ -13,4 +13,5 @@ residr = repmat( resid.', ns, 1 );
 pr = repmat( poles, ns, 1 );
 vt = sum( residr ./ ( repmat( s, 1, np ) - pr ), 2 ) + d;
 rmserr = sqrt( sum( abs( ( vt - v ).^2 ) ) ) / sqrt( ns );
-maxerr = max( abs( vt - v ) );
+err = abs( vt - v );
+maxerr = max( err );
