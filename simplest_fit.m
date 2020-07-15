@@ -59,7 +59,7 @@ for iter = 1:(niter+1)
         break
     end
 
-    A3 = -repmat( val, 1, np ) .* A1;
+    A3 = -diag( val ) * A1;
     
     A = [ A1 A2 A3 ];
     
@@ -102,3 +102,6 @@ residr = repmat( resid.', ns, 1 );
 pr = repmat( poles, ns, 1 );
 vt = sum( residr ./ ( repmat( s, 1, np ) - pr ), 2 ) + d;
 rmserr = sqrt( sum( abs( ( vt - val ).^2 ) ) ) / sqrt( ns );
+
+% To have poles and residues arranged the same way, as the column vectors
+poles = transpose( poles );

@@ -1,15 +1,18 @@
-function [ poles, resid, d, rmserr ] = causal_fit( f, v, weight, np, nit, asymp )
-% [ poles, resid, d, rmserr ] = causal_fit( f, v, weight, np, nit, asymp )
+function [ poles, resid, d, rmserr ] = vector_fit( f, v, weight, np, nit, asymp )
+% [ poles, resid, d, rmserr ] = vector_fit( f, v, weight, np, nit, asymp )
 %
-% Simple implementation of the vector fitting, does not use negative
-% frequencies, ensures perfect causal pole pairs, supports weight.
+% Almost complete implementation of the vector fitting, unity non-triviality
+% constant.
 %
-
-frq = f;
-val = v;
 
 % Laplace variable, n-by-1
-s = 2*pi*i*frq;
+s = 2*pi*i*f;
+
+% number of the vector elements
+nv = size( v, 2 );
+
+% number of the frequency samples
+ns = size( s, 1 );
 
 % Initial poles
 startp = max( f(1), 10 )*2*pi;
@@ -25,7 +28,6 @@ poles = [ poles -endp*ones( 1, rem( np, 2 ) ) ];
 % Sort into complex conjugate pairs. Positive imaginary first.
 poles = flipdim( cplxpair( poles ), 2 );
 
-ns = size( s, 1 );
 np = size( poles, 2 );
 
 % Matrix A, used for the pole identification, consists of three row blocks.
@@ -66,19 +68,36 @@ for iter = 1:(nit+1)
         break
     end
 
-    A3 = -diag( val ) * A1;
+    
+    A = [ ];
+    b = [ ];
+    
+    for iv = 1:nv
+        vi = v(:,iv);            % samples of this element
+        wi = diag(weight(:,iv)); % weights of this element
 
-    % A and b both scaled by weight
-    A = diag(weight)*[ A1 A2 A3 ];
-    b = diag(weight)*val;
+        A12i = [ real( wi*[ A1 A2 ] )     ; imag( wi*[ A1 A2 ] ) ];
+        A3i  = [ real( -diag( vi ) * A1 ) ; imag( -diag( vi ) * A1 ) ];
+        
+        %% 'slow' VF
+        %% A12 = blkdiag( A12, A12i );
+        %% A3  = [ A3 ; A3i ];
+        %% bb  = [ bb ; real(wi*vi) ; imag(wi*vi) ];
 
-    Ar = [ real(A) ; imag(A) ]; % to preserve conjugacy
-    br = [ real(b) ; imag(b) ];
+        %% fast VF -- diagonalize A matrix, keep the last column block only
+        [ Q, R ] = qr( [ A12i A3i ], 0 );
+        R22 = R(end-np+1:end,end-np+1:end);
+        
+        A = [ A ; R22 ];
+        b = [ b ; Q(:,end-np+1:end)'*[ real(wi*vi) ; imag(wi*vi) ] ];
+        
+    end
 
-    x = Ar \ br;
+    %% 'slow' VF
+    %% A = [ A12 A3 ];
+    %% x = A\b;
 
-    %cfs = x( 1 : np );          % Residues of val*sigma approximation
-    %cs  = x( end-np+1 : end );  % Residues of sigma approximation
+    x = A \ b;
 
     % Residues of sigma approximation, with conjugate pairs
     cs = x( end-np+1 : end );  % real
@@ -115,34 +134,41 @@ for iter = 1:(nit+1)
 end
 
 % Doing final residue calculation
-% A and b both scaled by weight
-A = diag(weight)*[ A1 A2 ];
-b = diag(weight)*val;
+resid = zeros( np, nv );
+d = zeros( 1, nv );
 
-% to preserve conjugacy
-Ar = [ real(A) ; imag(A) ]; 
-br = [ real(b) ; imag(b) ];
+for iv = 1:nv
 
-x = Ar \ br;
+    vi = v(:,iv);            % samples of this element
+    wi = diag(weight(:,iv)); % weights of this element
+    
+    % A and b both scaled by weight
+    A = wi*[ A1 A2 ];
+    b = wi*vi;
 
-% Residues, with conjugate pairs
-resid = x( 1 : np ); % real
-resid(cpi1) = real( x( cpi1 ) ) + j*real( x( cpi2 ) );
-resid(cpi2) = real( x( cpi1 ) ) - j*real( x( cpi2 ) );
+    % to preserve conjugacy
+    A = [ real(A) ; imag(A) ]; 
+    b = [ real(b) ; imag(b) ];
 
-% Constant term
-if asymp == 1
-    d = x( np + 1 );
-else
-    d = 0;
+    x = A \ b;
+
+    % Residues, with conjugate pairs
+    resid(:,iv) = x( 1 : np ); % real
+    resid(cpi1,iv) = real( x( cpi1 ) ) + j*real( x( cpi2 ) );
+    resid(cpi2,iv) = real( x( cpi1 ) ) - j*real( x( cpi2 ) );
+
+    % Constant term
+    if asymp == 1
+        d(iv) = x( np + 1 );
+    end
+
 end
-
-
-% Calculate error
-residr = repmat( resid.', ns, 1 );
-pr = repmat( poles, ns, 1 );
-vt = sum( residr ./ ( repmat( s, 1, np ) - pr ), 2 ) + d;
-rmserr = sqrt( sum( abs( ( vt - val ).^2 ) ) ) / sqrt( ns );
 
 % To have poles and residues arranged the same way, as the column vectors
 poles = transpose( poles );
+
+% Calculate error
+residr = repmat( permute( resid, [ 3 2 1 ] ), ns, 1 );
+pr = repmat( permute( poles, [ 3 2 1 ] ), ns, nv );
+vt = sum( residr ./ ( repmat( s, [ 1 nv np ] ) - pr ), 3 ) + d;
+rmserr = sqrt( sum( sum( abs( ( vt - v ).^2 ), 2 ), 1 ) ) / sqrt( ns*nv );

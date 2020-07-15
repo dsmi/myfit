@@ -66,14 +66,25 @@ assert( rmserr < 1e-3 )
 assert( err(1) < 1e-12 )
 
 
+% Load the tabulated curve to fit
+[ fhz, v2 ] = load_s2p( "test_pdn.s2p" );
 
+% Order of approximation, number of poles
+npoles = 100;
 
+% Number of the pole relocating iterations
+niter = 3;
 
-%% % number of ports
-%% Np = size( v2, 1 );
+nports = size(v2, 1);
 
-%% % vector to be fitted, Nc-by-Ns
-%% v = reshape( v2, [], Np*Np );
-%% size(v)
+% vector to fit
+v = transpose( reshape( v2, nports*nports, [] ) );
 
-%% [ poles, resid, d ] = vector_fit( f, v, npoles, niter );
+weight = v*0+1;
+
+% Vector fitting!
+[ poles, resid, d ] = vector_fit( fhz, v, weight, npoles, niter, 0 );
+
+[ rmserr, maxerr, err ] = calc_err( fhz, v, poles, resid, d );
+rmserr
+

@@ -26,12 +26,12 @@ if do_plots
     s = 2*pi*i*frq;
 
     ns = size( s, 1 );
-    np = size( poles, 2 );
+    np = size( poles, 1 );
 
     % Plot source and approximated function
     figure(1)
     residr = repmat( resid.', ns, 1 );
-    pr = repmat( poles, ns, 1 );
+    pr = repmat( poles.', ns, 1 );
     vt = sum( residr ./ ( repmat( s, 1, np ) - pr ), 2 ) + d;
     maxerr = max( abs( vt - val ) );
     plot( s/i, abs(val), '*r', s/i, abs(vt), '-b' );
@@ -63,7 +63,7 @@ if do_plots
 
     ns = size( s, 1 );
     residr = repmat( resid.', ns, 1 );
-    pr = repmat( poles, ns, 1 );
+    pr = repmat( poles.', ns, 1 );
     ft = sum( residr ./ ( repmat( s, 1, np ) - pr ), 2 );
 
     ftmesh = reshape( ft, ni, nr );
